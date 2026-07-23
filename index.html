@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LockIn - Focus or Die (Trying)</title>
+    <style>
+        :root {
+            --bg-color: #5d4037; /* Brown library back */
+            --text-color: #fafafa;
+            --accent-color: #ffca28; /* LockoIns gold */
+            --danger-color: #ef5350;
+            --success-color: #66bb6a;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* API Key Header */
+        #api-header {
+            background: rgba(0,0,0,0.5);
+            width: 100%;
+            padding: 10px;
+            text-align: center;
+            border-bottom: 2px solid var(--accent-color);
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        #api-key-input {
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            padding: 5px;
+            width: 250px;
+        }
+        .test-btn {
+            background-color: #ab47bc !important;
+            color: #fff !important;
+            width: auto !important;
+            padding: 5px 15px !important;
+        }
+
+        /* Main Layout */
+        #main-container {
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            max-width: 1200px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Sidebar & Shop */
+        #sidebar {
+            flex: 1;
+            background: rgba(0,0,0,0.2);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .profile-card, .shop-card, .session-card {
+            border: 1px solid #795548;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        input, textarea {
+            width: 100%;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid #795548;
+            color: #fff;
+            margin-bottom: 10px;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        }
+        button:hover { opacity: 0.8; }
+        .stats { font-size: 1.2em; color: var(--accent-color); margin-bottom: 10px;}
+
+        /* Classroom Area */
+        #classroom {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3 desks long */
+            grid-template-rows: repeat(2, 1fr);   /* 2 desks wide */
+            gap: 20px;
+            padding: 20px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><text x="50%" y="50%" font-size="10" opacity="0.1" fill="white" text-anchor="middle">📖</text></svg>');
+            border-radius: 10px;
+        }
+
+        .desk {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid #a1887f;
+            border-radius: 10px;
+            height: 130px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            font-size: 3em;
+            user-select: none;
+        }
+        .desk-label {
+            position: absolute;
+            bottom: 5px;
+            font-size: 0.3em;
+            background: rgba(0,0,0,0.5);
+            padding: 2px 5px;
+        }
+
+        /* NPC & Player States */
+        .npc { opacity: 0.7; cursor: pointer; }
+        .player { border: 3px solid var(--accent-color); box-shadow: 0 0 15px var(--accent-color); }
+        
+        .state-scared { animation: shake 0.5s; animation-iteration-count: infinite; }
+        .state-typing { color: orange; }
+        .state-success { color: var(--success-color); }
+        .state-failed { color: var(--danger-color); opacity: 0.5; }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            80% { transform: translate(2px, -2px) rotate(-1deg); }
+            100% { transform: translate(1px, 2px) rotate(0deg); }
+        }
+
+        /* Popups */
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none; justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        #challenge-box {
+            background: #222; padding: 30px; border: 2px solid var(--danger-color);
+            text-align: center; border-radius: 10px; max-width: 500px; width: 90%;
+        }
+        #challenge-timer { font-size: 2.5em; color: var(--danger-color); margin: 10px 0; font-weight: bold; }
+        
+        .session-info {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- API KEY HEADER -->
+    <div id="api-header">
+        <div>
+            <label>GROQ API KEY: </label>
+            <input type="password" id="api-key-input" placeholder="gsk_...">
+        </div>
+        <button class="test-btn" onclick="triggerTestChallenge()">🧪 Test the System</button>
+    </div>
+
+    <div id="main-container">
+        
+        <!-- SIDEBAR: PROFILE & SHOP -->
+        <div id="sidebar">
+            <div class="profile-card">
+                <h3>Profile</h3>
+                <div class="stats">LockoIns: <span id="lockoins-count">0</span> 💰</div>
+                <input type="text" id="player-name" placeholder="Your Name" value="Studious🤓">
+                <textarea id="player-dream" placeholder="Dream: Why are you studying?"></textarea>
+                <button onclick="saveProfile()">Save Profile</button>
+            </div>
+            
+            <div class="shop-card">
+                <h3>Souvenir Shop</h3>
+                <button onclick="buyItem('Model S', 500)" style="margin-bottom: 5px;">Tesla Model S (500 💰)</button>
+                <button onclick="buyItem('VC Hoodie', 50)">VC Hoodie (50 💰)</button>
+                <p id="shop-status" style="font-size: 0.8em; margin-top: 5px; color: var(--accent-color);"></p>
+            </div>
+        </div>
+
+        <!-- CLASSROOM AREA -->
+        <div id="classroom">
+            <!-- Session Controls -->
+            <div class="session-card">
+                <h3>Focus Session Setup</h3>
+                <input type="text" id="session-goal" placeholder="Current Goal (e.g., Build pitch deck)">
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <input type="number" id="session-duration" placeholder="Minutes" value="25" min="1" max="180">
+                    <button onclick="startSession()" id="start-session-btn" style="background-color: var(--success-color);">START FOCUS</button>
+                </div>
+                <div class="session-info">
+                    <div id="session-status-text">Status: Idle. Set goal & time.</div>
+                    <div id="session-timer-display" style="font-size: 1.5em; color: var(--accent-color); margin-top: 5px;">00:00</div>
+                </div>
+            </div>
+
+            <!-- Library Grid -->
+            <div class="grid-container">
+                <div class="desk npc state-working" onclick="botherBot(this)">👤<div class="desk-label">Bot 1</div></div>
+                <div class="desk npc state-working" onclick="botherBot(this)">👤<div class="desk-label">Bot 2</div></div>
+                <div class="desk npc state-working" onclick="botherBot(this)">👤<div class="desk-label">Bot 3</div></div>
+                <div class="desk npc state-working" onclick="botherBot(this)">👤<div class="desk-label">Bot 4</div></div>
+                <div class="desk player state-working" id="player-desk">🤓<div class="desk-label">YOU</div></div>
+                <div class="desk npc state-working" onclick="botherBot(this)">👤<div class="desk-label">Bot 5</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHALLENGE OVERLAY -->
+    <div id="overlay">
+        <div id="challenge-box">
+            <h1 style="color: var(--danger-color); margin: 0;">PROVE IT!</h1>
+            <p>The system demands proof of work.</p>
+            <div id="challenge-question" style="font-style: italic; font-size: 1.1em; margin: 15px 0;"></div>
+            <div id="challenge-timer">30</div>
+            <textarea id="proof-input" placeholder="Type what you did to prove focus..."></textarea>
+            <button onclick="submitProof()" style="background-color: var(--success-color);">Submit Proof</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS ---
+        const POKE_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes between checks
+        const PROOF_TIMEOUT_S = 30; // 30 seconds to answer
+
+        // --- STATE ---
+        let lockoins = parseInt(localStorage.getItem('lockoins')) || 0;
+        let isSessionActive = false;
+        let sessionSecondsLeft = 0;
+        let sessionTimerInterval;
+        let pokesInterval;
+        
+        let isChallenged = false;
+        let challengeTimerInterval;
+
+        // --- DOM ---
+        const el = {
+            apiKey: document.getElementById('api-key-input'),
+            lockoins: document.getElementById('lockoins-count'),
+            playerName: document.getElementById('player-name'),
+            playerDream: document.getElementById('player-dream'),
+            playerDesk: document.getElementById('player-desk'),
+            sessionGoal: document.getElementById('session-goal'),
+            sessionDuration: document.getElementById('session-duration'),
+            sessionStatus: document.getElementById('session-status-text'),
+            sessionTimerDisplay: document.getElementById('session-timer-display'),
+            startBtn: document.getElementById('start-session-btn'),
+            overlay: document.getElementById('overlay'),
+            challengeTimer: document.getElementById('challenge-timer'),
+            question: document.getElementById('challenge-question'),
+            proof: document.getElementById('proof-input')
+        };
+
+        // --- INIT ---
+        function init() {
+            el.lockoins.innerText = lockoins;
+            el.playerName.value = localStorage.getItem('playerName') || "Studious🤓";
+            el.playerDream.value = localStorage.getItem('playerDream') || "";
+            el.sessionGoal.value = localStorage.getItem('sessionGoal') || "";
+        }
+
+        function saveProfile() {
+            localStorage.setItem('playerName', el.playerName.value);
+            localStorage.setItem('playerDream', el.playerDream.value);
+            localStorage.setItem('sessionGoal', el.sessionGoal.value);
+            alert("Profile & Goal Saved!");
+        }
+
+        function updateLockoins(amount = 0) {
+            lockoins += amount;
+            localStorage.setItem('lockoins', lockoins);
+            el.lockoins.innerText = lockoins;
+        }
+
+        function buyItem(name, cost) {
+            if (lockoins >= cost) {
+                lockoins -= cost;
+                updateLockoins(0);
+                document.getElementById('shop-status').innerText = `Bought ${name}! Flexing...`;
+            } else {
+                document.getElementById('shop-status').innerText = `Need more LockoIns!`;
+            }
+        }
+
+        // --- SESSION LOGIC ---
+        function startSession() {
+            if (isSessionActive) return;
+            const goal = el.sessionGoal.value.trim();
+            const minutes = parseInt(el.sessionDuration.value);
+
+            if (!goal) {
+                alert("Please set a goal first!");
+                return;
+            }
+            if (!minutes || minutes <= 0) {
+                alert("Enter valid minutes!");
+                return;
+            }
+
+            isSessionActive = true;
+            sessionSecondsLeft = minutes * 60;
+            el.startBtn.disabled = true;
+            el.startBtn.style.opacity = 0.5;
+            el.sessionStatus.innerText = `Focusing on: "${goal}"`;
+
+            // Session Countdown
+            sessionTimerInterval = setInterval(() => {
+                sessionSecondsLeft--;
+                updateTimerDisplay();
+
+                if (sessionSecondsLeft <= 0) {
+                    endSession(true);
+                }
+            }, 1000);
+
+            // Start periodic bot pokes/checks
+            pokesInterval = setInterval(() => {
+                pokeEveryone();
+            }, POKE_INTERVAL_MS);
+        }
+
+        function endSession(success) {
+            clearInterval(sessionTimerInterval);
+            clearInterval(pokesInterval);
+            isSessionActive = false;
+            el.startBtn.disabled = false;
+            el.startBtn.style.opacity = 1;
+
+            if (success) {
+                const minutes = parseInt(el.sessionDuration.value);
+                const earned = minutes * 5; // 5 LockoIns per minute
+                updateLockoins(earned);
+                el.sessionStatus.innerText = `SESSION COMPLETED! Earned ${earned} 💰!`;
+                alert(`Amazing work! Goal completed. You earned ${earned} LockoIns!`);
+            } else {
+                el.sessionStatus.innerText = `Session aborted.`;
+            }
+        }
+
+        function updateTimerDisplay() {
+            const m = Math.floor(sessionSecondsLeft / 60);
+            const s = sessionSecondsLeft % 60;
+            el.sessionTimerDisplay.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // --- INSTANT TEST TRIGGER ---
+        function triggerTestChallenge() {
+            pokeEveryone(true);
+        }
+
+        // --- POKES & CHECKS ---
+        function pokeEveryone(force = false) {
+            if (!isSessionActive && !force) return;
+            const desks = document.querySelectorAll('.desk');
+            
+            desks.forEach(desk => {
+                const isPlayer = desk.id === 'player-desk';
+                setDeskState(desk, '😨', 'scared');
+
+                setTimeout(() => {
+                    if (isPlayer) {
+                        startPlayerChallenge();
+                    } else {
+                        setDeskState(desk, '😌', 'success');
+                        setTimeout(() => setDeskState(desk, '👤', 'working'), 2000);
+                    }
+                }, 1500);
+            });
+        }
+
+        function setDeskState(deskEl, emoji, stateClass) {
+            deskEl.classList.remove('state-scared', 'state-typing', 'state-success', 'state-failed');
+            deskEl.firstChild.textContent = emoji;
+        }
+
+        // --- CHALLENGE SYSTEM ---
+        function startPlayerChallenge() {
+            if (isChallenged) return;
+            isChallenged = true;
+            el.proof.value = "";
+            el.overlay.style.display = 'flex';
+            setDeskState(el.playerDesk, '😰', 'typing');
+            
+            generateGroqQuestion();
+
+            let timeLeft = PROOF_TIMEOUT_S;
+            el.challengeTimer.innerText = timeLeft;
+            challengeTimerInterval = setInterval(() => {
+                timeLeft--;
+                el.challengeTimer.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    failChallenge();
+                }
+            }, 1000);
+        }
+
+        function failChallenge() {
+            clearInterval(challengeTimerInterval);
+            isChallenged = false;
+            el.overlay.style.display = 'none';
+            setDeskState(el.playerDesk, '😮‍💨', 'failed');
+            alert("TIME OUT! Proof failed. No check bonus.");
+            setTimeout(() => setDeskState(el.playerDesk, '🤓', 'working'), 3000);
+        }
+
+        function submitProof() {
+            if (!isChallenged) return;
+            clearInterval(challengeTimerInterval);
+            
+            const text = el.proof.value.trim();
+            if (text.length < 5) {
+                alert("Too short! Be a good botty and write what you did.");
+                failChallenge();
+                return;
+            }
+
+            isChallenged = false;
+            el.overlay.style.display = 'none';
+            setDeskState(el.playerDesk, '😌', 'success');
+            updateLockoins(15); // +15 bonus for surviving check
+            setTimeout(() => setDeskState(el.playerDesk, '🤓', 'working'), 2000);
+        }
+
+        function botherBot(botEl) {
+            alert("Be a good botty!");
+            botEl.classList.add('state-scared');
+            setTimeout(() => botEl.classList.remove('state-scared'), 1000);
+        }
+
+        // --- GROQ INTEGRATION WITH DEBUG & FILTER ---
+        async function generateGroqQuestion() {
+            const key = el.apiKey.value.trim();
+            const currentGoal = el.sessionGoal.value.trim() || "studying";
+            
+            el.question.style.color = "var(--accent-color)";
+            el.question.innerText = "Consulting AI task-master...";
+
+            if (!key.startsWith('gsk_')) {
+                showErrorAndFallback("No valid Groq API Key provided (must start with gsk_).", currentGoal);
+                return;
+            }
+
+            try {
+                // 1. Fetch available active models
+                const modelsResponse = await fetch('https://api.groq.com/openai/v1/models', {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${key}` }
+                });
+
+                if (!modelsResponse.ok) {
+                    throw new Error(`Groq Models API status ${modelsResponse.status}: ${modelsResponse.statusText}`);
+                }
+
+                const modelsData = await modelsResponse.json();
+                
+                // 2. Strict filter (No Whisper, Vision, Guard)
+                const textModels = (modelsData.data || []).filter(m => {
+                    const id = m.id.toLowerCase();
+                    return !id.includes('whisper') && 
+                           !id.includes('vision') && 
+                           !id.includes('guard') && 
+                           !id.includes('safeguard');
+                });
+
+                if (textModels.length === 0) {
+                    throw new Error("No suitable text models found in your Groq account.");
+                }
+
+                const activeModel = textModels[0].id;
+                console.log(`Auto-selected text model: ${activeModel}`);
+
+                // 3. Request completion
+                const chatResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${key}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: activeModel,
+                        messages: [
+                            { role: "system", content: "You are the strict LockIn monitor. Generate a very short verification question based on the user's goal to prove they are working. Max 12 words." },
+                            { role: "user", content: `My goal is: ${currentGoal}. Prove I am working.` }
+                        ]
